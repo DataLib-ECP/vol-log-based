@@ -124,10 +124,13 @@ herr_t H5VL_log_object_copy (void *src_obj,
 				src_name, dst_obj, dst_loc_params, dst_name, vname[0], vname[1], vname[2], req);
 	}
 #endif
+	if (o_src->fp->use_log_vol == 0) {
+		goto regular_file;
+	}
 	ERR_OUT ("H5VL_log_object_copy Not Supported")
 err_out:;
 	return -1;
-
+regular_file:;
 	return H5VLobject_copy (o_src->uo, src_loc_params, src_name, o_dst->uo, dst_loc_params,
 							dst_name, o_src->uvlid, ocpypl_id, lcpl_id, dxpl_id, req);
 } /* end H5VL_log_object_copy() */
@@ -173,19 +176,21 @@ herr_t H5VL_log_object_get (void *obj,
 #endif
 
 	// Block access to internal objects
-	switch (loc_params->type) {
-		case H5VL_OBJECT_BY_NAME:
-			if (!(loc_params->loc_data.loc_by_name.name) ||
-				loc_params->loc_data.loc_by_name.name[0] == '_') {
-				RET_ERR ("Access to internal objects denied")
-			}
-			break;
-		case H5VL_OBJECT_BY_SELF:
-			break;
-		case H5VL_OBJECT_BY_IDX:
-		case H5VL_OBJECT_BY_TOKEN:
-			RET_ERR ("Access by idx annd token is not supported")
-			break;
+	if (op->fp->use_log_vol == 1) {
+		switch (loc_params->type) {
+			case H5VL_OBJECT_BY_NAME:
+				if (!(loc_params->loc_data.loc_by_name.name) ||
+					loc_params->loc_data.loc_by_name.name[0] == '_') {
+					RET_ERR ("Access to internal objects denied")
+				}
+				break;
+			case H5VL_OBJECT_BY_SELF:
+				break;
+			case H5VL_OBJECT_BY_IDX:
+			case H5VL_OBJECT_BY_TOKEN:
+				RET_ERR ("Access by idx annd token is not supported")
+				break;
+		}
 	}
 
 	err = H5VLobject_get (op->uo, loc_params, op->uvlid, args, dxpl_id, req);
@@ -237,6 +242,10 @@ herr_t H5VL_log_object_specific (void *obj,
 	}
 #endif
 
+	// zanhua
+	if (op->fp->use_log_vol == 0) {
+		return H5VLobject_specific (op->uo, loc_params, op->uvlid, args, dxpl_id, req);
+	}
 	// Block access to internal objects
 	switch (loc_params->type) {
 		case H5VL_OBJECT_BY_NAME:
@@ -318,7 +327,12 @@ herr_t H5VL_log_object_optional (void *obj,
 		printf ("H5VL_log_object_optional(%p, %s, %s,%p, ...)\n", obj, vname[0], vname[1], req);
 	}
 #endif
-
+	// Zanhua
+	if (op->fp->use_log_vol == 0) {
+		err = H5VLobject_optional (op->uo, loc_params, op->uvlid, args, dxpl_id, req);
+		CHECK_ERR
+		return err;
+	}
 	// Block access to internal objects
 	switch (loc_params->type) {
 		case H5VL_OBJECT_BY_NAME:

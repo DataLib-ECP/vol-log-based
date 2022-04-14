@@ -130,6 +130,7 @@ void *H5VL_log_file_create (
 	fp->mdsize = 0;
 	fp->zbsize = 0;
 	fp->zbuf   = NULL;
+	fp->use_log_vol = 1;
 	mpierr	   = MPI_Comm_dup (comm, &(fp->comm));
 	CHECK_MPIERR
 	if (mpiinfo != MPI_INFO_NULL) {
@@ -283,6 +284,7 @@ void *H5VL_log_file_open (
 	void *under_vol_info;
 	MPI_Comm comm;
 	MPI_Info mpiinfo = MPI_INFO_NULL;
+	printf("Zanhua, File open called\n");
 
 	H5VL_LOGI_PROFILING_TIMER_START;
 
@@ -349,6 +351,7 @@ void *H5VL_log_file_open (
 	fp->mdsize = 0;
 	fp->zbsize = 0;
 	fp->zbuf   = NULL;
+	fp->use_log_vol = 1;
 	mpierr	   = MPI_Comm_dup (comm, &(fp->comm));
 	CHECK_MPIERR
 	if (mpiinfo != MPI_INFO_NULL) {
@@ -485,7 +488,10 @@ herr_t H5VL_log_file_specific (void *file,
 		printf ("H5VL_log_file_specific(%p, %s, %s, %p, ...)\n", file, vname[0], vname[1], req);
 	}
 #endif
-
+	// Zanhua
+	if (fp->use_log_vol == 0) {
+		return H5VLfile_specific (fp->uo, fp->uvlid, args, dxpl_id, req);
+	}
 	switch (args->op_type) {
 		case H5VL_FILE_IS_ACCESSIBLE:
 		case H5VL_FILE_DELETE: {
@@ -573,6 +579,11 @@ herr_t H5VL_log_file_optional (void *file, H5VL_optional_args_t *args, hid_t dxp
 	CHECK_ERR
 	H5VL_LOGI_PROFILING_TIMER_STOP (fp, TIMER_H5VLFILE_OPTIONAL);
 
+	// Zanhua
+	if (fp->use_log_vol == 0) {
+		return err;
+	}
+	
 	// Open the log group and read file attributes
 	if (args->op_type == H5VL_NATIVE_FILE_POST_OPEN) {
 		if (!(fp->lgp)) {  // Log group is already set for file create
@@ -603,6 +614,11 @@ err_out:;
  *-------------------------------------------------------------------------
  */
 herr_t H5VL_log_file_close (void *file, hid_t dxpl_id, void **req) {
-	return H5VL_log_filei_dec_ref ((H5VL_log_file_t *)file);
+	printf("zanhua, close is called\n");
+	H5VL_log_file_t *fp = (H5VL_log_file_t *)file;
+	if (fp->use_log_vol == 0){
+		return H5VLfile_close (fp->uo, fp->uvlid, H5P_DATASET_XFER_DEFAULT, NULL);
+	}
+	return H5VL_log_filei_dec_ref (fp);
 	// return H5VL_log_filei_close ((H5VL_log_file_t *)file);
 } /* end H5VL_log_file_close() */

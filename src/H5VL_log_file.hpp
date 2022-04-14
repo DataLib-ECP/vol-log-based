@@ -39,6 +39,8 @@ typedef struct H5VL_log_file_t : H5VL_log_obj_t {
 	MPI_Comm comm;	// Global communicator
 	MPI_Info info;	// Main file info
 
+	int use_log_vol;  // indicate whether the file is formatted as log-vol
+
 	/* Aligned data layout */
 	// Group is a set of processes sharing the same subfile or lustre stripe
 	int group_id;		  // ID of the group

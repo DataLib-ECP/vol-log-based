@@ -70,11 +70,20 @@ herr_t H5VL_log_filei_post_open (H5VL_log_file_t *fp) {
 	H5VL_object_specific_args_t args;
 	int attbuf[5];
 
+	printf("Zanhua, post open called\n");
 	H5VL_LOGI_PROFILING_TIMER_START;
 
 	// Att
-	err = H5VL_logi_get_att (fp, H5VL_LOG_FILEI_ATTR_INT, H5T_NATIVE_INT32, attbuf, fp->dxplid);
+	hbool_t exists;
+	err = H5VL_logi_exists_att(fp->uo,fp->uvlid, fp->type, H5VL_LOG_FILEI_ATTR_INT, fp->dxplid, &exists);
 	CHECK_ERR
+	if (exists == 0) {
+		goto regular_file_out;
+	}
+	err = H5VL_logi_get_att(fp, H5VL_LOG_FILEI_ATTR_INT, H5T_NATIVE_INT32, attbuf, fp->dxplid);
+	CHECK_ERR
+
+
 	fp->ndset  = attbuf[0];
 	fp->nldset = attbuf[1];
 	fp->nmdset = attbuf[2];
@@ -146,6 +155,15 @@ herr_t H5VL_log_filei_post_open (H5VL_log_file_t *fp) {
 	H5VL_LOGI_PROFILING_TIMER_STOP (fp, TIMER_H5VL_LOG_FILE_OPEN);
 
 err_out:;
+	if (err < 0) {
+		printf("Zanhua, post open err out. Use regular HDF5 instead of LOG-VOL\n");
+		// TODO: clean up fp
+		fp->use_log_vol = 0;
+		return 0;
+	}
+	return err;
+regular_file_out:;
+	fp->use_log_vol = 0;
 	return err;
 }
 

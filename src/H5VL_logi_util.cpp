@@ -90,6 +90,25 @@ herr_t H5VL_logi_put_att (
 	H5VL_log_obj_t *op, const char *name, hid_t mtype, void *buf, hid_t dxpl_id) {
 	return H5VL_logi_put_att (op->uo, op->uvlid, op->type, name, mtype, buf, dxpl_id);
 }
+
+herr_t H5VL_logi_exists_att(void* uo, hid_t uvlid, H5I_type_t type, const char *name, hid_t dxpl_id, hbool_t *exists_ptr){
+	herr_t err = 0;
+	H5VL_loc_params_t loc;
+	H5VL_attr_specific_args_t attr_check_exists;
+
+	loc.obj_type = type;
+	loc.type	 = H5VL_OBJECT_BY_SELF;
+	
+	attr_check_exists.args.exists.name = name;
+	attr_check_exists.args.exists.exists = exists_ptr;
+	attr_check_exists.op_type = H5VL_ATTR_EXISTS;
+
+	err = H5VLattr_specific(uo, &loc, uvlid, &attr_check_exists, dxpl_id, NULL);
+	CHECK_ERR
+err_out:;
+	return err;
+}
+
 herr_t H5VL_logi_get_att (void *uo,
 						  hid_t uvlid,
 						  H5I_type_t type,
@@ -101,10 +120,25 @@ herr_t H5VL_logi_get_att (void *uo,
 	H5VL_loc_params_t loc;
 	void *ap;
 
+	// printf("zanhua, inside logi_get_att\n");
 	loc.obj_type = type;
 	loc.type	 = H5VL_OBJECT_BY_SELF;
 
-	ap = H5VLattr_open (uo, &loc, uvlid, name, H5P_ATTRIBUTE_ACCESS_DEFAULT, dxpl_id, NULL);
+	// check for exists
+	// H5VL_attr_specific_args_t attr_check_exists;
+	// hbool_t exists = false;
+	// attr_check_exists.args.exists.name = name;
+	// attr_check_exists.args.exists.exists = &exists;
+	// attr_check_exists.op_type = H5VL_ATTR_EXISTS;
+
+	// err = H5VLattr_specific(uo, &loc, uvlid, &attr_check_exists, dxpl_id, NULL);
+	// CHECK_ERR
+	// if (exists == false) {
+	// 	err = -1;
+	// 	goto err_out;
+	// }
+
+	ap = H5VLattr_open(uo, &loc, uvlid, name, H5P_ATTRIBUTE_ACCESS_DEFAULT, dxpl_id, NULL);
 	CHECK_PTR (ap);
 	err = H5VLattr_read (ap, uvlid, mtype, buf, dxpl_id, NULL);
 	CHECK_ERR;
@@ -112,6 +146,7 @@ herr_t H5VL_logi_get_att (void *uo,
 	CHECK_ERR
 
 err_out:;
+	// if (ap == NULL) err = -1;
 	return err;
 }
 herr_t H5VL_logi_get_att (

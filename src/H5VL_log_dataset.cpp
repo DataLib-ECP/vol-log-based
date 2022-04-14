@@ -73,6 +73,7 @@ void *H5VL_log_dataset_create (void *obj,
 	H5VL_log_req_t *rp;
 	void **ureqp, *ureq;
 	// char lname[1024];
+	printf("\nzanhua, H5VL_log_dataset_create called. is log: %d\n", op->fp->use_log_vol);
 
 	H5VL_LOGI_PROFILING_TIMER_START;
 
@@ -88,6 +89,13 @@ void *H5VL_log_dataset_create (void *obj,
 		ureqp = NULL;
 	}
 
+	dp	   = new H5VL_log_dset_t (op, H5I_DATASET);
+	if (op->fp->use_log_vol == 0) {
+		// dp->fp = op->fp;
+		dp->uo = H5VLdataset_create(op->uo, loc_params, op->uvlid, name, lcpl_id, type_id, space_id, dcpl_id, dapl_id, dxpl_id, ureqp);
+		goto fn_exit;
+	}
+
 	// Create anchor dataset
 	// TODO: native VOL will not save filter information when layout is contiguous
 	sid = H5Screate (H5S_SCALAR);
@@ -95,7 +103,7 @@ void *H5VL_log_dataset_create (void *obj,
 	err = H5Pset_layout (dcpl_id, H5D_CONTIGUOUS);
 	CHECK_ERR
 
-	dp	   = new H5VL_log_dset_t (op, H5I_DATASET);
+	
 	dp->id = dp->fp->ndset;	 // ID nees to be set before writing to attribute
 
 	H5VL_LOGI_PROFILING_TIMER_START;
@@ -214,9 +222,17 @@ void *H5VL_log_dataset_open (void *obj,
 	if (H5VL_logi_debug_verbose ()) { printf ("H5VL_log_dataset_open(%p, %s)\n", obj, name); }
 #endif
 
+	
+
+	if (op->fp->use_log_vol == 0) {
+		H5VL_log_dset_t* dp	   = new H5VL_log_dset_t (op, H5I_DATASET);
+		// dp->fp = op->fp;
+		dp->uo = H5VLdataset_open (op->uo, loc_params, op->uvlid, name, dapl_id, dxpl_id, NULL);
+		return (void*) dp;
+	}
 	/* Check arguments */
 	H5VL_LOGI_CHECK_NAME (name);
-
+	
 	H5VL_LOGI_PROFILING_TIMER_START;
 	uo = H5VLdataset_open (op->uo, loc_params, op->uvlid, name, dapl_id, dxpl_id, NULL);
 	CHECK_PTR (uo);
@@ -247,10 +263,17 @@ herr_t H5VL_log_dataset_read (void *dset,
 							  void **req) {
 	herr_t err				  = 0;
 	H5VL_log_dset_t *dp		  = (H5VL_log_dset_t *)dset;
+	
+	if(dp->fp->use_log_vol == 0){
+		err = H5VLdataset_read(dp->uo, dp->uvlid, mem_type_id, mem_space_id, file_space_id, plist_id, buf, NULL);
+		return err;
+	}
+
 	H5VL_log_dset_info_t *dip = dp->fp->dsets_info[dp->id];	 // Dataset info
 	hid_t dsid;												 // Dataset space id
 	H5VL_log_selections *dsel = NULL;						 // Selection blocks
 
+	
 	H5VL_LOGI_PROFILING_TIMER_START;
 	if (file_space_id == H5S_ALL) {
 		dsid = H5Screate_simple (dip->ndim, dip->dims, dip->mdims);
@@ -290,12 +313,24 @@ herr_t H5VL_log_dataset_write (void *dset,
 							   hid_t plist_id,
 							   const void *buf,
 							   void **req) {
+	printf("zanhua, H5VL_log_dataset_write is called\n");
+	
 	herr_t err				  = 0;
 	H5VL_log_dset_t *dp		  = (H5VL_log_dset_t *)dset;
+	
+	if(dp->fp->use_log_vol == 0){
+		err = H5VLdataset_write(dp->uo, dp->uvlid, mem_type_id, mem_space_id, file_space_id, plist_id, buf, NULL);
+		return err;
+	}
+
 	H5VL_log_dset_info_t *dip = dp->fp->dsets_info[dp->id];	 // Dataset info
+
 	hid_t dsid;												 // Dataset space id
 	H5VL_log_selections *dsel = NULL;						 // Selection blocks
-
+	
+	
+	
+	
 	H5VL_LOGI_PROFILING_TIMER_START;
 	if (file_space_id == H5S_ALL) {
 		dsid = H5Screate_simple (dip->ndim, dip->dims, dip->mdims);
@@ -336,6 +371,11 @@ herr_t H5VL_log_dataset_get (void *dset, H5VL_dataset_get_args_t *args, hid_t dx
 	// H5VL_log_req_t *rp;
 	// void **ureqp, *ureq;
 	H5VL_LOGI_PROFILING_TIMER_START;
+
+	// Zanhua
+	if (dp->fp->use_log_vol == 0) {
+		return H5VLdataset_get(dp->uo,dp->uvlid, args, dxpl_id, req);
+	}
 
 	switch (args->op_type) {
 		/* H5Dget_space */
@@ -398,6 +438,11 @@ herr_t H5VL_log_dataset_specific (void *obj,
 	// H5VL_log_req_t *rp;
 	// void **ureqp, *ureq;
 	H5VL_LOGI_PROFILING_TIMER_START;
+
+	// Zanhua
+	if (dp->fp->use_log_vol == 0) {
+		return H5VLdataset_specific (dp->uo, dp->uvlid, args, dxpl_id, req);
+	}
 
 	switch (args->op_type) {
 		case H5VL_DATASET_SET_EXTENT: { /* H5Dset_extent */
@@ -470,6 +515,10 @@ herr_t H5VL_log_dataset_optional (void *obj,
 	H5VL_log_dio_n_arg_t *varnarg = (H5VL_log_dio_n_arg_t *)(args->args);  // H5Dwrite_n args
 
 	H5VL_LOGI_PROFILING_TIMER_START;
+
+	if (dp->fp->use_log_vol == 0) {
+		return H5VLdataset_optional (op->uo, op->uvlid, args, dxpl_id, req);
+	}
 
 	if (args->op_type == H5Dwrite_n_op_val) {
 		H5VL_LOGI_PROFILING_TIMER_START;
